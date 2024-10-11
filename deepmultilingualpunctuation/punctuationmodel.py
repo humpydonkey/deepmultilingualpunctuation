@@ -1,4 +1,5 @@
 from concurrent.futures import process
+import string
 from transformers import pipeline
 import re
 import torch
@@ -11,8 +12,8 @@ class PunctuationModel():
             self.pipe = pipeline("ner",model, aggregation_strategy="none")        
 
     def preprocess(self,text):
-        #remove markers except for markers in numbers 
-        text = re.sub(r"(?<!\d)[.,;:!?](?!\d)","",text) 
+        # do not remove existing punctuations/markers
+        # text = re.sub(r"(?<!\d)[.,;:!?](?!\d)","",text)
         #todo: match acronyms https://stackoverflow.com/questions/35076016/regex-to-match-acronyms
         text = text.split()
         return text
@@ -59,7 +60,7 @@ class PunctuationModel():
                     score = result[result_index]['score']
                     result_index += 1                        
                 tagged_words.append([word,label, score])
-        
+
         assert len(tagged_words) == len(words)
         return tagged_words
 
@@ -67,16 +68,24 @@ class PunctuationModel():
         result = ""
         for word, label, _ in prediction:
             result += word
-            if label == "0":
+            if label in "0-":
                 result += " "
-            if label in ".,?-:":
-                result += label+" "
+            if label in ".,?:":
+                # result += label+" "
+                # don't append a punctuation if the word ends with a punctuation
+                if word[-1] in string.punctuation:
+                    result += " "
+                else:
+                    result += label+" "
         return result.strip()
 
 if __name__ == "__main__":    
     model = PunctuationModel()
 
-    text = "das , ist fies "
+    # text = "das , ist fies "
+    # text = "What was it like raising funds as an academic now entering this private world to be raising money?"
+    from pathlib import Path
+    text = Path("document.txt").read_text().replace("\n", " ")
     # restore add missing punctuation
     result = model.restore_punctuation(text)
     print(result)
